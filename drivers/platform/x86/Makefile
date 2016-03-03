@@ -76,3 +76,10 @@ obj-$(CONFIG_INTEL_TELEMETRY)	+= intel_telemetry_core.o \
 obj-$(CONFIG_INTEL_PMC_CORE)    += intel_pmc_core.o
 obj-$(CONFIG_MLX_PLATFORM)	+= mlx-platform.o
 obj-$(CONFIG_MLX_CPLD_PLATFORM)	+= mlxcpld-hotplug.o
+
+obj-$(CONFIG_INTEL_SGX) += intel_sgx.o
+intel_sgx-$(CONFIG_INTEL_SGX) += intel_sgx_ioctl.o \
+				 intel_sgx_main.o \
+				 intel_sgx_page_cache.o \
+				 intel_sgx_util.o \
+				 intel_sgx_vma.o
