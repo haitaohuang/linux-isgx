@@ -219,40 +219,6 @@ static void sgx_ipi_cb(void *info)
 {
 }
 
-static void sgx_eblock(struct sgx_encl *encl,
-		       struct sgx_epc_page *epc_page)
-{
-	void *vaddr;
-	int ret;
-
-	vaddr = sgx_get_epc_page(epc_page);
-	ret = __eblock((unsigned long)vaddr);
-	sgx_put_epc_page(vaddr);
-
-	if (ret) {
-		sgx_crit(encl, "EBLOCK returned %d\n", ret);
-		sgx_invalidate(encl);
-		smp_call_function(sgx_ipi_cb, NULL, 1);
-	}
-
-}
-
-static void sgx_etrack(struct sgx_encl *encl)
-{
-	void *epc;
-	int ret;
-
-	epc = sgx_get_epc_page(encl->secs_page.epc_page);
-	ret = __etrack(epc);
-	sgx_put_epc_page(epc);
-
-	if (ret) {
-		sgx_crit(encl, "ETRACK returned %d\n", ret);
-		sgx_invalidate(encl);
-		smp_call_function(sgx_ipi_cb, NULL, 1);
-	}
-}
-
 static int __sgx_ewb(struct sgx_encl *encl,
 		     struct sgx_encl_page *encl_page)
 {

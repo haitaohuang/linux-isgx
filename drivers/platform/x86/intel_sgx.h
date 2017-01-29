@@ -228,6 +228,8 @@ struct sgx_encl_page *sgx_fault_page(struct vm_area_struct *vma,
 
 void sgx_encl_release(struct kref *ref);
 void sgx_tgid_ctx_release(struct kref *ref);
+void sgx_eblock(struct sgx_encl *encl, struct sgx_epc_page *epc_page);
+void sgx_etrack(struct sgx_encl *encl);
 
 /* EPC page cache */
 
