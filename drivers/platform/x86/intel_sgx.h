@@ -223,6 +223,7 @@ int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 
 enum sgx_fault_flags {
 	SGX_FAULT_RESERVE	= BIT(0),
+	SGX_FAULT_AUGMENT	= BIT(1),
 };
 
 struct sgx_encl_page *sgx_fault_page(struct vm_area_struct *vma,

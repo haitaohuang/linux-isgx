@@ -347,6 +347,35 @@ out:
 	return ret;
 }
 
+static int sgx_eaug(struct sgx_encl *encl,
+		    unsigned long addr,
+		    struct sgx_epc_page *epc_page)
+{
+	struct sgx_page_info pginfo;
+	void *secs_ptr;
+	void *epc_ptr;
+	int ret;
+
+	secs_ptr = sgx_get_epc_page(encl->secs_page.epc_page);
+	epc_ptr = sgx_get_epc_page(epc_page);
+
+	pginfo.srcpge = 0;
+	pginfo.secinfo = 0;
+	pginfo.linaddr = addr;
+	pginfo.secs = (unsigned long)secs_ptr;
+
+	ret = __eaug(&pginfo, epc_ptr);
+	if (ret) {
+		sgx_err(encl, "EAUG returned %d\n", ret);
+		ret = -EFAULT;
+	}
+
+	sgx_put_epc_page(epc_ptr);
+	sgx_put_epc_page(secs_ptr);
+
+	return ret;
+}
+
 static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 					  unsigned long addr, unsigned int flags)
 {
@@ -355,6 +384,7 @@ static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 	struct sgx_epc_page *epc_page = NULL;
 	struct sgx_epc_page *secs_epc_page = NULL;
 	bool reserve = (flags & SGX_FAULT_RESERVE) != 0;
+	bool augment = (flags & SGX_FAULT_AUGMENT) != 0;
 	int rc = 0;
 
 	/* If process was forked, VMA is still there but vm_private_data is set
@@ -367,8 +397,12 @@ static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 
 	entry = radix_tree_lookup(&encl->page_tree, addr >> PAGE_SHIFT);
 	if (!entry) {
-		rc = -ENOENT;
-		goto out;
+		if (!augment && !sgx_has_sgx2) {
+			rc = -ENOENT;
+			goto out;
+		}
+	} else {
+		augment = false;
 	}
 
 	epc_page = sgx_alloc_page(encl->tgid_ctx, SGX_ALLOC_ATOMIC);
@@ -376,6 +410,18 @@ static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 		rc = PTR_ERR(epc_page);
 		epc_page = NULL;
 		goto out;
+	}
+
+	if (augment) {
+		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+		if (!entry) {
+			entry = ERR_PTR(-ENOMEM);
+			goto out;
+		}
+
+		rc = sgx_init_page(encl, entry, addr, SGX_ALLOC_ATOMIC);
+		if (rc)
+			goto out;
 	}
 
 	if (encl->flags & SGX_ENCL_DEAD) {
@@ -423,9 +469,15 @@ static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 		secs_epc_page = NULL;
 	}
 
-	rc = sgx_eldu(encl, entry, epc_page, false /* is_secs */);
-	if (rc)
-		goto out;
+	if (augment) {
+		rc = sgx_eaug(encl, addr, epc_page);
+		if (rc)
+			goto out;
+	} else {
+		rc = sgx_eldu(encl, entry, epc_page, false /* is_secs */);
+		if (rc)
+			goto out;
+	}
 
 	rc = vm_insert_pfn(vma, entry->addr, PFN_DOWN(epc_page->pa));
 	if (rc)
@@ -438,17 +490,20 @@ static struct sgx_encl_page *sgx_do_fault(struct vm_area_struct *vma,
 	if (reserve)
 		entry->flags |= SGX_ENCL_PAGE_RESERVED;
 
-	/* Do not free */
-	epc_page = NULL;
-
 	sgx_test_and_clear_young(entry, encl);
 	list_add_tail(&entry->load_list, &encl->load_list);
+
+	/* Do not free */
+	epc_page = NULL;
+	entry = NULL;
 out:
 	mutex_unlock(&encl->lock);
 	if (epc_page)
 		sgx_free_page(epc_page, encl, 0);
 	if (secs_epc_page)
 		sgx_free_page(secs_epc_page, encl, 0);
+	if (augment)
+		kfree(entry);
 	return rc ? ERR_PTR(rc) : entry;
 }
 
