@@ -217,6 +217,8 @@ void sgx_unpin_mm(struct sgx_encl *encl);
 void sgx_invalidate(struct sgx_encl *encl);
 int sgx_find_encl(struct mm_struct *mm, unsigned long addr,
 		  struct vm_area_struct **vma);
+int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
+		  unsigned long addr, unsigned int alloc_flags);
 
 enum sgx_fault_flags {
 	SGX_FAULT_RESERVE	= BIT(0),

@@ -212,6 +212,75 @@ int sgx_find_encl(struct mm_struct *mm, unsigned long addr,
 	return 0;
 }
 
+/**
+ * sgx_init_page - initialize an enclave page
+ * @encl:		the enclave to which the page is associated
+ * @entry:		uninitialized enclave page
+ * @addr:		address for the page in the ELRANGE
+ * @alloc_flags:	flags passed to sgx_alloc_page()
+ *
+ * Allocate a VA slot and store the address to the instance.
+ */
+int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
+		  unsigned long addr, unsigned int alloc_flags)
+{
+	struct sgx_va_page *va_page;
+	struct sgx_epc_page *epc_page = NULL;
+	unsigned int va_offset = PAGE_SIZE;
+	void *vaddr;
+	int ret = 0;
+
+	list_for_each_entry(va_page, &encl->va_pages, list) {
+		va_offset = sgx_alloc_va_slot(va_page);
+		if (va_offset < PAGE_SIZE)
+			break;
+	}
+
+	if (va_offset == PAGE_SIZE) {
+		va_page = kzalloc(sizeof(*va_page), GFP_KERNEL);
+		if (!va_page)
+			return -ENOMEM;
+
+		epc_page = sgx_alloc_page(encl->tgid_ctx, 0);
+		if (IS_ERR(epc_page)) {
+			kfree(va_page);
+			return PTR_ERR(epc_page);
+		}
+
+		vaddr = sgx_get_epc_page(epc_page);
+		if (!vaddr) {
+			sgx_warn(encl, "kmap of a new VA page failed %d\n",
+				 ret);
+			sgx_free_page(epc_page, encl, 0);
+			kfree(va_page);
+			return -EFAULT;
+		}
+
+		ret = __epa(vaddr);
+		sgx_put_epc_page(vaddr);
+
+		if (ret) {
+			sgx_warn(encl, "EPA returned %d\n", ret);
+			sgx_free_page(epc_page, encl, 0);
+			kfree(va_page);
+			return -EFAULT;
+		}
+
+		va_page->epc_page = epc_page;
+		va_offset = sgx_alloc_va_slot(va_page);
+
+		mutex_lock(&encl->lock);
+		list_add(&va_page->list, &encl->va_pages);
+		mutex_unlock(&encl->lock);
+	}
+
+	entry->va_page = va_page;
+	entry->va_offset = va_offset;
+	entry->addr = addr;
+
+	return 0;
+}
+
 static int sgx_eldu(struct sgx_encl *encl,
 		    struct sgx_encl_page *encl_page,
 		    struct sgx_epc_page *epc_page,
