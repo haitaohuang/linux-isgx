@@ -61,8 +61,9 @@
 #include "sgx.h"
 #include <linux/highmem.h>
 #include <linux/shmem_fs.h>
+#ifndef EXTERNAL_DRIVER
 #include <linux/sched/mm.h>
-
+#endif
 struct page *sgx_get_backing(struct sgx_encl *encl,
 			     struct sgx_encl_page *entry,
 			     bool pcmd)
@@ -369,8 +370,13 @@ void sgx_encl_release(struct kref *ref)
 	mutex_unlock(&sgx_tgid_ctx_mutex);
 
 	if (encl->mmu_notifier.ops)
+#ifndef EXTERNAL_DRIVER
 		mmu_notifier_unregister_no_release(&encl->mmu_notifier,
 						   encl->mm);
+#else
+		mmu_notifier_unregister(&encl->mmu_notifier,
+						   encl->mm);
+#endif
 
 	radix_tree_for_each_slot(slot, &encl->page_tree, &iter, 0) {
 		entry = *slot;

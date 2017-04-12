@@ -60,7 +60,17 @@
 #ifndef __ARCH_INTEL_SGX_H__
 #define __ARCH_INTEL_SGX_H__
 
-#include <uapi/asm/sgx.h>
+#ifndef EXTERNAL_DRIVER
+ #include <uapi/asm/sgx.h>
+ #include <asm/sgx.h>
+#else
+#include "sgx_user.h"
+#include "sgx_arch.h"
+#ifndef X86_FEATURE_SGX
+#define X86_FEATURE_SGX         ( 9*32+ 2) /* Software Guard Extensions */
+#endif
+#endif
+
 #include <linux/kref.h>
 #include <linux/rbtree.h>
 #include <linux/rwsem.h>
@@ -68,7 +78,6 @@
 #include <linux/workqueue.h>
 #include <linux/mmu_notifier.h>
 #include <linux/radix-tree.h>
-#include <asm/sgx.h>
 
 #define SGX_EINIT_SPIN_COUNT	20
 #define SGX_EINIT_SLEEP_COUNT	50

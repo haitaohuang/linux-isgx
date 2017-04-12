@@ -63,7 +63,9 @@
 #include <linux/highmem.h>
 #include <linux/kthread.h>
 #include <linux/ratelimit.h>
+#ifndef EXTERNAL_DRIVER
 #include <linux/sched/signal.h>
+#endif
 #include <linux/slab.h>
 
 #define SGX_NR_LOW_EPC_PAGES_DEFAULT 32

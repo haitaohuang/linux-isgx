@@ -64,7 +64,9 @@
 #include <linux/file.h>
 #include <linux/highmem.h>
 #include <linux/ratelimit.h>
+#ifndef EXTERNAL_DRIVER
 #include <linux/sched/signal.h>
+#endif
 #include <linux/slab.h>
 #include <linux/hashtable.h>
 #include <linux/shmem_fs.h>

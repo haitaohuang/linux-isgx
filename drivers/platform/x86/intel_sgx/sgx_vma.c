@@ -93,11 +93,16 @@ static void sgx_vma_close(struct vm_area_struct *vma)
 	mutex_unlock(&encl->lock);
 	kref_put(&encl->refcount, sgx_encl_release);
 }
-
+#ifdef EXTERNAL_DRIVER
+static int sgx_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+        unsigned long addr = (unsigned long)vmf->virtual_address;
+#else
 static int sgx_vma_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
-	unsigned long addr = (unsigned long)vmf->address;
+	unsigned long addr = vmf->address;
+#endif
 	struct sgx_encl_page *entry;
 
 	entry = sgx_fault_page(vma, addr, 0);
