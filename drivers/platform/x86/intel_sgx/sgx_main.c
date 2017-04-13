@@ -259,8 +259,11 @@ static int sgx_pm_resume(struct device *dev)
 }
 
 static SIMPLE_DEV_PM_OPS(sgx_drv_pm, sgx_pm_suspend, sgx_pm_resume);
-
+#ifdef EXTERNAL_DRIVER
+static int __init isgx_init(void)
+#else
 static int sgx_dev_init(struct device *dev)
+#endif
 {
 	unsigned int wq_flags;
 	int ret;
@@ -307,8 +310,9 @@ static int sgx_dev_init(struct device *dev)
 		ret = -ENOMEM;
 		goto out_iounmap;
 	}
-
+#ifndef EXTERNAL_DRIVER
 	sgx_dev.parent = dev;
+#endif
 	ret = misc_register(&sgx_dev);
 	if (ret) {
 		pr_err("intel_sgx: misc_register() failed\n");
@@ -325,7 +329,7 @@ out_iounmap:
 #endif
 	return ret;
 }
-
+#ifndef EXTERNAL_DRIVER
 static int sgx_drv_probe(struct platform_device *pdev)
 {
 	unsigned int eax, ebx, ecx, edx;
@@ -375,8 +379,12 @@ static int sgx_drv_probe(struct platform_device *pdev)
 
 	return sgx_dev_init(&pdev->dev);
 }
-
+#endif
+#ifdef EXTERNAL_DRIVER
+static void __exit isgx_exit(void)
+#else
 static int sgx_drv_remove(struct platform_device *pdev)
+#endif
 {
 	int i;
 
@@ -399,6 +407,10 @@ static struct acpi_device_id sgx_device_ids[] = {
 MODULE_DEVICE_TABLE(acpi, sgx_device_ids);
 #endif
 
+#ifdef EXTERNAL_DRIVER
+module_init(isgx_init);
+module_exit(isgx_exit);
+#else
 static struct platform_driver sgx_drv = {
 	.probe = sgx_drv_probe,
 	.remove = sgx_drv_remove,
@@ -408,7 +420,6 @@ static struct platform_driver sgx_drv = {
 		.acpi_match_table	= ACPI_PTR(sgx_device_ids),
 	},
 };
-
 module_platform_driver(sgx_drv);
-
+#endif
 MODULE_LICENSE("Dual BSD/GPL");
